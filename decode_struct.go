@@ -368,6 +368,7 @@ func decodeKeyByBitmapUint8Stream(d *structDecoder, s *stream) (*structFieldSet,
 									return nil, "", errUnexpectedEndOfJSON("string", s.totalOffset())
 								}
 								buf, cursor, p = s.stat()
+								cursor--
 							}
 						}
 					}
@@ -465,6 +466,7 @@ func decodeKeyByBitmapUint16Stream(d *structDecoder, s *stream) (*structFieldSet
 									return nil, "", errUnexpectedEndOfJSON("string", s.totalOffset())
 								}
 								buf, cursor, p = s.stat()
+								cursor--
 							}
 						}
 					}
