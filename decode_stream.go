@@ -18,6 +18,7 @@ type stream struct {
 	offset                int64
 	cursor                int64
 	allRead               bool
+	filledBuffer          bool
 	useNumber             bool
 	disallowUnknownFields bool
 }
@@ -60,10 +61,12 @@ func (s *stream) reset() {
 }
 
 func (s *stream) readBuf() []byte {
-	s.bufSize *= 2
-	remainBuf := s.buf
-	s.buf = make([]byte, s.bufSize)
-	copy(s.buf, remainBuf)
+	if s.filledBuffer {
+		s.bufSize *= 2
+		remainBuf := s.buf
+		s.buf = make([]byte, s.bufSize)
+		copy(s.buf, remainBuf)
+	}
 	return s.buf[s.cursor:]
 }
 
@@ -76,6 +79,12 @@ func (s *stream) read() bool {
 	buf[last] = nul
 	n, err := s.r.Read(buf[:last])
 	s.length = s.cursor + int64(n)
+	if n == (len(buf) - 1) {
+		s.filledBuffer = true
+	} else {
+		// Didn't fill the buffer, slow reader. Don't grow it the next time.
+		s.filledBuffer = false
+	}
 	if err == io.EOF {
 		s.allRead = true
 	} else if err != nil {

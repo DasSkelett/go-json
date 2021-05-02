@@ -3,6 +3,7 @@ package benchmark
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	gojay "github.com/francoispqt/gojay"
@@ -433,4 +434,67 @@ func Benchmark_Decode_LargeStruct_Stream_GoJson(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// Benchmark decoding from a slow io.Reader that never fills the buffer completely
+func Benchmark_Decode_SlowReader_EncodingJson(b *testing.B) {
+	b.ReportAllocs()
+	for _, chunkSize := range [5]int{16384, 4096, 1024, 256, 64} {
+		b.Run(fmt.Sprintf("chunksize %v", chunkSize),
+			func(b2 *testing.B) {
+				for i := 0; i < b2.N; i++ {
+					result := LargePayload{}
+					slowReaderIndex = 0
+					err := json.NewDecoder(slowReader{chunkSize: chunkSize}).Decode(&result)
+					if err != nil {
+						b2.Fatal(err)
+					}
+				}
+			},
+		)
+	}
+}
+
+func Benchmark_Decode_SlowReader_GoJson(b *testing.B) {
+	b.ReportAllocs()
+	for _, chunkSize := range [5]int{16384, 4096, 1024, 256, 64} {
+		b.Run(fmt.Sprintf("chunksize %v", chunkSize),
+			func(b2 *testing.B) {
+				for i := 0; i < b2.N; i++ {
+					result := LargePayload{}
+					slowReaderIndex = 0
+					err := gojson.NewDecoder(slowReader{chunkSize: chunkSize}).Decode(&result)
+					if err != nil {
+						b2.Fatal(err)
+					}
+				}
+			},
+		)
+	}
+}
+
+type slowReader struct {
+	chunkSize int
+}
+
+var slowReaderIndex int
+var slowReaderBuffer []byte
+
+func (s slowReader) Read(p []byte) (n int, err error) {
+	smallBufferLength := Min(s.chunkSize, len(p))
+	if slowReaderBuffer == nil || len(slowReaderBuffer) != smallBufferLength {
+		slowReaderBuffer = make([]byte, smallBufferLength)
+	}
+	x := bytes.NewReader(LargeFixture)
+	n, err = x.ReadAt(slowReaderBuffer, int64(slowReaderIndex))
+	slowReaderIndex += n
+	copy(p, slowReaderBuffer)
+	return
+}
+
+func Min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }
