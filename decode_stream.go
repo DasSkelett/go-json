@@ -27,7 +27,7 @@ func newStream(r io.Reader) *stream {
 	return &stream{
 		r:       r,
 		bufSize: initBufSize,
-		buf:     []byte{nul},
+		buf:     make([]byte, initBufSize),
 	}
 }
 
@@ -77,7 +77,14 @@ func (s *stream) read() bool {
 	buf := s.readBuf()
 	last := len(buf) - 1
 	buf[last] = nul
-	n, err := s.r.Read(buf[:last])
+	var n int
+	var err error
+	for {
+		n, err = s.r.Read(buf[:last])
+		if n > 0 || err != nil {
+			break
+		}
+	}
 	s.length = s.cursor + int64(n)
 	if n == (len(buf) - 1) {
 		s.filledBuffer = true
